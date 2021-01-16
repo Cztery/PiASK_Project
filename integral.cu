@@ -1,13 +1,5 @@
 #include <math.h>
 #include <stdio.h>
-/**
- * @struct FunctionData_t
- * @brief Data creating polynomial function - degree and array of coefficients
- */
-typedef struct FunctionData {
-  unsigned int polynomialDegree;  /**<Degree of polynomial*/
-  float* coefficients;   /**<Polynomial's coefficients*/
-} FunctionData_t;
 
 __device__ double myPower(float number, int degree) {
   double result = 1.0;
@@ -33,29 +25,29 @@ __device__ double myPower(float number, int degree) {
  * @param x Function input value
  * @param function Polynomial function data.
  */
-__device__ double function(float x, FunctionData_t* functionInput) {
+__device__ double function(float x, float* coefficients, unsigned int polynomialDegree) {
    unsigned int polynomialItertor = 0;
    double functionResult = 0;
    double tmpCalc;
-   for(polynomialItertor = 0; polynomialItertor <= (functionInput->polynomialDegree); polynomialItertor++) {
-     tmpCalc = functionInput->coefficients[polynomialItertor] * myPower(x,polynomialItertor);
+   for(polynomialItertor = 0; polynomialItertor <= polynomialDegree; polynomialItertor++) {
+     tmpCalc = coefficients[polynomialItertor] * myPower(x,polynomialItertor);
      functionResult += tmpCalc;
    }
    return functionResult;
 }
 
-__host__ double functionHost(float x, FunctionData_t* functionInput) {
+__host__ double functionHost(float x, float* coefficients, unsigned int polynomialDegree) {
    unsigned int polynomialItertor = 0;
    double functionResult = 0;
    double tmpCalc;
-   for(polynomialItertor = 0; polynomialItertor <= (functionInput->polynomialDegree); polynomialItertor++) {
-     tmpCalc = functionInput->coefficients[polynomialItertor] * pow(x,polynomialItertor);
+   for(polynomialItertor = 0; polynomialItertor <= polynomialDegree; polynomialItertor++) {
+     tmpCalc = coefficients[polynomialItertor] * pow(x,polynomialItertor);
      functionResult += tmpCalc;
    }
    return functionResult;
 }
 
-__global__ void numericalIntegration(FunctionData_t* function_input, int N, float offs, float eps, float *result) {
+__global__ void numericalIntegration(float* coefficients, unsigned int polynomialDegree, int N, float offs, float eps, float *result) {
   int i = threadIdx.x + blockIdx.x*blockDim.x;
   float xl, xh, fl, fh, flh;
   if (i==0) {
@@ -64,26 +56,32 @@ __global__ void numericalIntegration(FunctionData_t* function_input, int N, floa
   if (i<N) {
     xl = offs + i*eps;
     xh = xl + eps;
-    fl = function(xl,function_input);
-    fh = function(xh,function_input);
+    fl = function(xl,coefficients,polynomialDegree);
+    fh = function(xh,coefficients,polynomialDegree);
     flh = 0.5*(fl+fh)*(xh-xl);
     atomicAdd( result, flh);
   }
 
 }
 
-int GPU_Integration(FunctionData_t* function_input, float lo, float hi, float prec, float *result, int *pn, int nBlk, int nThx) {
+int GPU_Integration(float* coefficients, unsigned int polynomialDegree, float lo, float hi, float prec, float *result, int *pn, int nBlk, int nThx) {
   float *result_d, del, flo, fhi;
   int n;
   cudaEvent_t start, stop;
 
-  flo = functionHost(lo,function_input);
-  fhi = functionHost(hi,function_input);
+  float* coefficients_d = NULL;
+  cudaMalloc((void**) &coefficients_d, polynomialDegree+1);
+
+
+  flo = functionHost(lo, coefficients, polynomialDegree);
+  fhi = functionHost(hi, coefficients, polynomialDegree);
 
   n = 0.5*(hi-lo)*(flo-fhi)/prec;
   *pn = n;
   del = (hi-lo)/((double) n);
+
   cudaMalloc((void **) &result_d, sizeof(float));
+  cudaMemcpy(coefficients, coefficients_d, polynomialDegree+1, cudaMemcpyHostToDevice);
 
   float time;
   cudaEventCreate(&start);
@@ -95,29 +93,27 @@ int GPU_Integration(FunctionData_t* function_input, float lo, float hi, float pr
   printf("    Number of thread per block: %d\n", nThx);
   printf("    Precision of integral calculation %f\n", prec);
 
-  numericalIntegration<<<nBlk,nThx>>>(function_input,n,lo,del,result_d);
+  numericalIntegration<<<nBlk,nThx>>>(coefficients,polynomialDegree,n,lo,del,result_d);
 
   cudaEventRecord(stop, 0);
   cudaEventSynchronize(stop);
   cudaEventElapsedTime(&time, start, stop);
   printf("  GPU time is %f ms\n", time);
 
-  cudaMemcpy(result, result_d, sizeof(int), cudaMemcpyDeviceToHost);
+  cudaMemcpy(result, result_d, sizeof(float), cudaMemcpyDeviceToHost);
   cudaFree(result_d);
+  cudaFree(coefficients_d);
   return 0;
 }
 
 int main(void) {
+  const unsigned int polynomial1Size = 3;
+  const unsigned int polynomial2Size = 6;
   float polynomial1[3];
 
   polynomial1[0] = 1.0;
   polynomial1[1] = 2.5;
   polynomial1[2] = 1.25;
-
-  FunctionData_t function1 = {
-    .polynomialDegree = 2,
-    .coefficients = polynomial1
-  };
 
   float polynomial2[6];
   polynomial2[0] = 3.1;
@@ -126,11 +122,6 @@ int main(void) {
   polynomial2[3] = 10.1;
   polynomial2[4] = 54.0;
   polynomial2[5] = 1.25;
-
-  FunctionData_t function2 = {
-    .polynomialDegree = 5,
-    .coefficients = polynomial2
-  };
 
   float lowData = 0.0;
   float highData = 10.0;
@@ -155,35 +146,35 @@ int main(void) {
   int pn;
 
   printf("Function 1 nBlk: %d, nThx: %d \n", nBlk, nThx);
-  GPU_Integration(&function1, lowData, highData, prec1, &result1, &pn, nBlk, nThx);
+  GPU_Integration(polynomial1, polynomial1Size, lowData, highData, prec1, &result1, &pn, nBlk, nThx);
   printf("  Result %f\n", result1);
 
   printf("Function 1 nBlk: %d, nThx: %d \n", nBlk1, nThx1);
-  GPU_Integration(&function1, lowData, highData, prec1, &result2, &pn, nBlk1, nThx1);
+  GPU_Integration(polynomial1, polynomial1Size, lowData, highData, prec1, &result2, &pn, nBlk1, nThx1);
   printf("  Result %f\n", result2);
 
   printf("Function 1 nBlk: %d, nThx: %d \n", nBlk, nThx);
-  GPU_Integration(&function1, lowData, highData, prec2, &result3, &pn, nBlk, nThx);
+  GPU_Integration(polynomial1, polynomial1Size, lowData, highData, prec2, &result3, &pn, nBlk, nThx);
   printf("  Result %f\n", result3);
 
   printf("Function 1 nBlk: %d, nThx: %d \n", nBlk1, nThx1);
-  GPU_Integration(&function1, lowData, highData, prec2, &result4, &pn, nBlk1, nThx1);
+  GPU_Integration(polynomial1, polynomial1Size, lowData, highData, prec2, &result4, &pn, nBlk1, nThx1);
   printf("  Result %f\n", result4);
 
 
   printf("Function 2 nBlk: %d, nThx: %d \n", nBlk, nThx);
-  GPU_Integration(&function2, lowData, highData, prec1, &result11, &pn, nBlk, nThx);
+  GPU_Integration(polynomial2, polynomial2Size, lowData, highData, prec1, &result11, &pn, nBlk, nThx);
   printf("  Result %f\n", result11);
 
   printf("Function 2 nBlk: %d, nThx: %d \n", nBlk1, nThx1);
-  GPU_Integration(&function2, lowData, highData, prec1, &result21, &pn, nBlk1, nThx1);
+  GPU_Integration(polynomial2, polynomial2Size, lowData, highData, prec1, &result21, &pn, nBlk1, nThx1);
   printf("  Result %f\n", result21);
 
   printf("Function 2 nBlk: %d, nThx: %d \n", nBlk, nThx);
-  GPU_Integration(&function2, lowData, highData, prec2, &result31, &pn, nBlk, nThx);
+  GPU_Integration(polynomial2, polynomial2Size, lowData, highData, prec2, &result31, &pn, nBlk, nThx);
   printf("  Result %f\n", result31);
 
   printf("Function 2 nBlk: %d, nThx: %d \n", nBlk1, nThx1);
-  GPU_Integration(&function2, lowData, highData, prec2, &result41, &pn, nBlk1, nThx1);
+  GPU_Integration(polynomial2, polynomial2Size, lowData, highData, prec2, &result41, &pn, nBlk1, nThx1);
   printf("  Result %f\n", result41);
 }

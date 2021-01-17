@@ -30,7 +30,6 @@ __device__ double function(float x, float* coefficients, unsigned int polynomial
    double functionResult = 0;
    double tmpCalc;
    for(polynomialItertor = 0; polynomialItertor <= polynomialDegree; polynomialItertor++) {
-     printf("   %f\n", coefficients[polynomialItertor]);
      tmpCalc = coefficients[polynomialItertor] * myPower(x,polynomialItertor);
      functionResult += tmpCalc;
    }
@@ -81,6 +80,8 @@ int GPU_Integration(float* coefficients, unsigned int polynomialDegree, float lo
   *pn = n;
   del = (hi-lo)/((double) n);
 
+  int nBLK = (int)(n+nThx-1)/nThx;
+
   cudaMalloc((void **) &result_d, sizeof(float));
 
   float time;
@@ -93,7 +94,7 @@ int GPU_Integration(float* coefficients, unsigned int polynomialDegree, float lo
   printf("    Number of thread per block: %d\n", nThx);
   printf("    Precision of integral calculation %f\n", prec);
 
-  numericalIntegration<<<nBlk,nThx>>>(coefficients_d,polynomialDegree,n,lo,del,result_d);
+  numericalIntegration<<<nBLK,nThx>>>(coefficients_d,polynomialDegree,n,lo,del,result_d);
 
   cudaEventRecord(stop, 0);
   cudaEventSynchronize(stop);
@@ -141,10 +142,10 @@ int main(void) {
   float result31 = 0.0;
   float result41 = 0.0;
 
-  int nBlk = 256;
-  int nThx = 256;
-  int nBlk1 = 512;
-  int nThx1 = 512;
+  int nBlk = 2;
+  int nThx = 1;
+  int nBlk1 = 128;
+  int nThx1 = 128;
 
   int pn;
 

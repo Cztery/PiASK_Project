@@ -30,6 +30,7 @@ __device__ double function(float x, float* coefficients, unsigned int polynomial
    double functionResult = 0;
    double tmpCalc;
    for(polynomialItertor = 0; polynomialItertor <= polynomialDegree; polynomialItertor++) {
+     printf("   %f\n", coefficients[polynomialItertor]);
      tmpCalc = coefficients[polynomialItertor] * myPower(x,polynomialItertor);
      functionResult += tmpCalc;
    }
@@ -58,7 +59,7 @@ __global__ void numericalIntegration(float* coefficients, unsigned int polynomia
     xh = xl + eps;
     fl = function(xl,coefficients,polynomialDegree);
     fh = function(xh,coefficients,polynomialDegree);
-    flh = 0.5*(fl+fh)*(xh-xl);
+    flh = 0.5*(fl+fh);
     atomicAdd( result, flh);
   }
 
@@ -69,19 +70,18 @@ int GPU_Integration(float* coefficients, unsigned int polynomialDegree, float lo
   int n;
   cudaEvent_t start, stop;
 
-  float* coefficients_d = NULL;
-  cudaMalloc((void**) &coefficients_d, polynomialDegree+1);
-
+  float* coefficients_d;
+  cudaMalloc((void**) &coefficients_d, sizeof(float)*(polynomialDegree+1));
+  cudaMemcpy(coefficients_d, coefficients, sizeof(float)*(polynomialDegree+1), cudaMemcpyHostToDevice);
 
   flo = functionHost(lo, coefficients, polynomialDegree);
   fhi = functionHost(hi, coefficients, polynomialDegree);
 
-  n = 0.5*(hi-lo)*(flo-fhi)/prec;
+  n = abs(0.5*(hi-lo)*(flo-fhi)/prec);
   *pn = n;
   del = (hi-lo)/((double) n);
 
   cudaMalloc((void **) &result_d, sizeof(float));
-  cudaMemcpy(coefficients, coefficients_d, polynomialDegree+1, cudaMemcpyHostToDevice);
 
   float time;
   cudaEventCreate(&start);
@@ -93,7 +93,7 @@ int GPU_Integration(float* coefficients, unsigned int polynomialDegree, float lo
   printf("    Number of thread per block: %d\n", nThx);
   printf("    Precision of integral calculation %f\n", prec);
 
-  numericalIntegration<<<nBlk,nThx>>>(coefficients,polynomialDegree,n,lo,del,result_d);
+  numericalIntegration<<<nBlk,nThx>>>(coefficients_d,polynomialDegree,n,lo,del,result_d);
 
   cudaEventRecord(stop, 0);
   cudaEventSynchronize(stop);
@@ -103,6 +103,9 @@ int GPU_Integration(float* coefficients, unsigned int polynomialDegree, float lo
   cudaMemcpy(result, result_d, sizeof(float), cudaMemcpyDeviceToHost);
   cudaFree(result_d);
   cudaFree(coefficients_d);
+
+
+  *result = *result*del;
   return 0;
 }
 
@@ -124,7 +127,7 @@ int main(void) {
   polynomial2[5] = 1.25;
 
   float lowData = 0.0;
-  float highData = 10.0;
+  float highData = 2.0;
   float prec1 = 0.01;
   float prec2 = 0.001;
 
@@ -138,10 +141,10 @@ int main(void) {
   float result31 = 0.0;
   float result41 = 0.0;
 
-  int nBlk = 64;
-  int nThx = 128;
-  int nBlk1 = 128;
-  int nThx1 = 256;
+  int nBlk = 256;
+  int nThx = 256;
+  int nBlk1 = 512;
+  int nThx1 = 512;
 
   int pn;
 

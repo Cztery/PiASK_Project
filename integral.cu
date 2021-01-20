@@ -57,7 +57,7 @@ __global__ void numericalIntegrationArray(float* coefficients, unsigned int poly
   }
 }
 
-int GPU_Integration2(float* coefficients, unsigned int polynomialDegree, float low, float high, float precision, float *result, int nThx) {
+int GPU_Integration(float* coefficients, unsigned int polynomialDegree, float low, float high, float precision, float *result, int nThx) {
    int numberOfPoints = (int) (high-low) / precision;
    int sizeOfArray = sizeof(float)*numberOfPoints;
    float *array, *deviceArray, *deviceArray1, *resultDevice;
@@ -154,35 +154,35 @@ int main(void) {
   int nThx1 = 256;
 
   printf("Function 1:");
-  GPU_Integration2(polynomial1, polynomial1Size, lowData, highData, prec1, &result1, nThx);
+  GPU_Integration(polynomial1, polynomial1Size, lowData, highData, prec1, &result1, nThx);
   printf("  Result %f\n", result1);
 
   printf("Function 1:");
-  GPU_Integration2(polynomial1, polynomial1Size, lowData, highData, prec1, &result2, nThx1);
+  GPU_Integration(polynomial1, polynomial1Size, lowData, highData, prec1, &result2, nThx1);
   printf("  Result %f\n", result2);
 
   printf("Function 1:");
-  GPU_Integration2(polynomial1, polynomial1Size, lowData, highData, prec2, &result3, nThx);
+  GPU_Integration(polynomial1, polynomial1Size, lowData, highData, prec2, &result3, nThx);
   printf("  Result %f\n", result3);
 
   printf("Function 1:");
-  GPU_Integration2(polynomial1, polynomial1Size, lowData, highData, prec2, &result4, nThx1);
+  GPU_Integration(polynomial1, polynomial1Size, lowData, highData, prec2, &result4, nThx1);
   printf("  Result %f\n", result4);
 
 
   printf("Function 2:");
-  GPU_Integration2(polynomial2, polynomial2Size, lowData, highData, prec1, &result11, nThx);
+  GPU_Integration(polynomial2, polynomial2Size, lowData, highData, prec1, &result11, nThx);
   printf("  Result %f\n", result11);
 
   printf("Function 2:");
-  GPU_Integration2(polynomial2, polynomial2Size, lowData, highData, prec1, &result21, nThx1);
+  GPU_Integration(polynomial2, polynomial2Size, lowData, highData, prec1, &result21, nThx1);
   printf("  Result %f\n", result21);
 
   printf("Function 2:");
-  GPU_Integration2(polynomial2, polynomial2Size, lowData, highData, prec2, &result31, nThx);
+  GPU_Integration(polynomial2, polynomial2Size, lowData, highData, prec2, &result31, nThx);
   printf("  Result %f\n", result31);
 
   printf("Function 2:");
-  GPU_Integration2(polynomial2, polynomial2Size, lowData, highData, prec2, &result41, nThx1);
+  GPU_Integration(polynomial2, polynomial2Size, lowData, highData, prec2, &result41, nThx1);
   printf("  Result %f\n", result41);
 }

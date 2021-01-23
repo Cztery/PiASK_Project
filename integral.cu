@@ -50,33 +50,31 @@ __host__ float functionHost(float x, float* coefficients, unsigned int polynomia
    return functionResult;
 }
 
-__global__ void numericalIntegrationArray(float* coefficients, unsigned int polynomialDegree, float* array, float* deviceArray1, float *result, int N) {
+__global__ void numericalIntegrationArray(float* coefficients, unsigned int polynomialDegree, float* xArray_device, float* yArray_device, int N) {
   int i = threadIdx.x + blockIdx.x*blockDim.x;
   if( i < N) {
-    deviceArray1[i] = function(&array[i],coefficients,polynomialDegree);
+    yArray_device[i] = function(&xArray_device[i],coefficients,polynomialDegree);
   }
 }
 
 int GPU_Integration(float* coefficients, unsigned int polynomialDegree, float low, float high, float precision, float *result, int nThx) {
    int numberOfPoints = (int) (high-low) / precision;
    int sizeOfArray = sizeof(float)*numberOfPoints;
-   float *array, *deviceArray, *deviceArray1, *resultDevice;
+   float *array, *xArray_device, *yArray_device;
    cudaEvent_t start, stop;
 
    array = (float*) malloc(sizeOfArray);
    for(int i = 0; i < numberOfPoints; i++) {
      array[i] = low+i*precision;
    }
-   cudaMalloc((void**)&deviceArray, sizeOfArray);
-   cudaMemcpy(deviceArray, array, sizeOfArray,cudaMemcpyHostToDevice);
+   cudaMalloc((void**)&xArray_device, sizeOfArray);
+   cudaMemcpy(xArray_device, array, sizeOfArray,cudaMemcpyHostToDevice);
 
-   cudaMalloc((void**)&deviceArray1, sizeOfArray);
+   cudaMalloc((void**)&yArray_device, sizeOfArray);
 
    float* coefficients_d;
    cudaMalloc((void**) &coefficients_d, sizeof(float)*(polynomialDegree+1));
    cudaMemcpy(coefficients_d, coefficients, sizeof(float)*(polynomialDegree+1), cudaMemcpyHostToDevice);
-
-   cudaMalloc((void **) &resultDevice, sizeof(float));
 
    int nBLK = (int)(numberOfPoints+nThx-1)/nThx;
 
@@ -90,25 +88,26 @@ int GPU_Integration(float* coefficients, unsigned int polynomialDegree, float lo
    cudaEventCreate(&stop);
    cudaEventRecord(start, 0);
 
-   numericalIntegrationArray<<<nBLK,nThx>>>(coefficients_d,polynomialDegree,deviceArray,deviceArray1,resultDevice,sizeOfArray);
+   numericalIntegrationArray<<<nBLK,nThx>>>(coefficients_d,polynomialDegree,xArray_device,yArray_device,sizeOfArray);
    cudaDeviceSynchronize();
 
+   //for (int n = ceil((float)sizeOfArray/2.); n > 2; n = ceil((float)sizeOfArray/2.)) {
+   //}
+
+printf("sizeofArray = %d", sizeOfArray);
    cudaEventRecord(stop, 0);
    cudaEventSynchronize(stop);
    cudaEventElapsedTime(&time, start, stop);
    printf("  GPU time is %f ms\n", time);
 
-   cudaMemcpy(result, resultDevice, sizeof(float), cudaMemcpyDeviceToHost);
-   cudaMemcpy(array, deviceArray1, sizeOfArray, cudaMemcpyDeviceToHost);
-   cudaFree(resultDevice);
+   cudaMemcpy(array, yArray_device, sizeOfArray, cudaMemcpyDeviceToHost);
    cudaFree(coefficients_d);
-   cudaFree(deviceArray);
-   cudaFree(deviceArray1);
+   cudaFree(xArray_device);
+   cudaFree(yArray_device);
 
 
    for(int j = 0; j < numberOfPoints ; j++  ) {
      *result += array[j];
-
    }
 
    *result *= precision;

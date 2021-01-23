@@ -10,5 +10,5 @@
 
 ## Select module and run task
 module add plgrid/tools/openmpi
-cd $HOME/labwork/PiASK_Project
+cd $HOME/labwork/PIASK_Project
 mpiexec mpi_integral

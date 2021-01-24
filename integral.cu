@@ -55,6 +55,13 @@ __global__ void numericalIntegrationArray(float* coefficients, unsigned int poly
   if( i < N) {
     yArray_device[i] = function(&xArray_device[i],coefficients,polynomialDegree);
   }
+  
+  for( int n = 1; n < (N + 1)/2; n *= 2) {
+    __syncthreads();
+    if( (i % n) == 0 && (i + n < N )) {
+      yArray_device[i] += yArray_device[i+n];
+    }
+  }
 }
 
 int GPU_Integration(float* coefficients, unsigned int polynomialDegree, float low, float high, float precision, float *result, int nThx) {
@@ -91,26 +98,22 @@ int GPU_Integration(float* coefficients, unsigned int polynomialDegree, float lo
    numericalIntegrationArray<<<nBLK,nThx>>>(coefficients_d,polynomialDegree,xArray_device,yArray_device,sizeOfArray);
    cudaDeviceSynchronize();
 
-   //for (int n = ceil((float)sizeOfArray/2.); n > 2; n = ceil((float)sizeOfArray/2.)) {
-   //}
-
-printf("sizeofArray = %d", sizeOfArray);
-   cudaEventRecord(stop, 0);
-   cudaEventSynchronize(stop);
-   cudaEventElapsedTime(&time, start, stop);
-   printf("  GPU time is %f ms\n", time);
 
    cudaMemcpy(array, yArray_device, sizeOfArray, cudaMemcpyDeviceToHost);
    cudaFree(coefficients_d);
    cudaFree(xArray_device);
    cudaFree(yArray_device);
 
-
-   for(int j = 0; j < numberOfPoints ; j++  ) {
+   *result = array[0];
+  /* for(int j = 0; j < numberOfPoints ; j++  ) {
      *result += array[j];
-   }
-
+   }*/
    *result *= precision;
+   
+   cudaEventRecord(stop, 0);
+   cudaEventSynchronize(stop);
+   cudaEventElapsedTime(&time, start, stop);
+   printf("  Integration time is %f ms\n", time);
 
    free(array);
 

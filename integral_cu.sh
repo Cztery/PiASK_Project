@@ -10,5 +10,5 @@
 #SBATCH --partition=plgrid-gpu
 #SBATCH --output=cu_integral.out
 ## Select module and run task
-cd $HOME/labwork/PIASK_Project
+cd $HOME/labwork/PiASK_Project
 ./cu_integral

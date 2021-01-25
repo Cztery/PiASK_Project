@@ -11,5 +11,5 @@
 ## Select module and run task
 
 module add plgrid/tools/intel
-cd $HOME/labwork/PIASK_Project
+cd $HOME/labwork/PiASK_Project
 ./omp_integral

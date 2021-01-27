@@ -3,7 +3,7 @@
 ## Get one node
 #SBATCH -N 1
 #SBATCH --partition=plgrid-c7
-#SBATCH --reservation=piask
+##SBATCH --reservation=piask
 #SBATCH --ntasks-per-node=4
 #SBATCH --time=00:10:00
 #SBATCH --output=mpi_integral.out

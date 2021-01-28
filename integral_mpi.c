@@ -39,13 +39,21 @@ double mpi_integrate (float* coefficients, unsigned int polynomialDegree, float 
   int subdomain_len = (domain_len + size - 1) / size;
   float* subdomain = (float*)calloc(subdomain_len, sizeof(float));
   MPI_Scatter(domain, subdomain_len, MPI_FLOAT, subdomain, subdomain_len, MPI_FLOAT, 0, MPI_COMM_WORLD);
-  for (int i = myid; i < subdomain_len; ++i) {
+  // subdomain may contain fewer values than subdomain_len - :q
+  int loop_limit = subdomain_len;
+  if (myid == size - 1) {
+    loop_limit = subdomain_len-(size*subdomain_len-domain_len);
+  }
+  for (int i = myid; i < loop_limit; ++i) {
+    // sum function values for the whole subdomain
     sub_sum += function(subdomain[i], coefficients, polynomialDegree);
   }
-  //MPI_Barrier(MPI_COMM_WORLD);
+  
+  // sum function results for all subdomains
   MPI_Reduce(&sub_sum, &global_sum, 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
   free(subdomain);
   if (myid == 0) {
+    // calculate final integral using formula: I = Precision * (Y[min]/2 + Y[min+1] + ... Y[max-1] + Y[max]/2)
     global_sum -= function(domain[0], coefficients, polynomialDegree)/2.;
     global_sum -= function(domain[domain_len-1], coefficients, polynomialDegree)/2.;
     *result = global_sum*precision;
@@ -59,7 +67,6 @@ int main(int argc, char** argv) {
   float result1, result2;
   float dom_min = 0.0;
   float dom_max = 4.0;
-  float prec = 0.00005;
 
   const unsigned int polynomial1Size = 2;
   float polynomial1[3];
@@ -81,14 +88,24 @@ int main(int argc, char** argv) {
   MPI_Comm_rank(MPI_COMM_WORLD, &myid);
   printf("my id = %d of %d\n", myid, size);
 
+  float prec = 0.00005;
   mpi_integrate(polynomial1, polynomial1Size, dom_min, dom_max, prec, &result1);
+  mpi_integrate(polynomial2, polynomial2Size, dom_min, dom_max, prec, &result2);
   
   MPI_Barrier(MPI_COMM_WORLD);
-
+  if (myid == 0) {
+  printf("Precision = %f:\n", prec);
+  printf(" Function 1 result: %f\n", result1);
+  printf(" Function 2 result: %f\n", result2);
+  }
+  
+  prec = 0.001;
+  mpi_integrate(polynomial1, polynomial1Size, dom_min, dom_max, prec, &result1);
   mpi_integrate(polynomial2, polynomial2Size, dom_min, dom_max, prec, &result2);
 
   MPI_Barrier(MPI_COMM_WORLD);
   if (myid == 0) {
+  printf("Precision = %f:\n", prec);
   printf(" Function 1 result: %f\n", result1);
   printf(" Function 2 result: %f\n", result2);
   }

@@ -33,4 +33,4 @@ omprun: omp_integral
 	sbatch integral_omp.sh && squeue && sleep 5 && cat omp_integral.out
 
 mpirun: mpi_integral
-	sbatch integral_mpi.sh && squeue && sleep 5 && cat mpi_integral.out
+	sbatch integral_mpi.sh && squeue && sleep 10 && cat mpi_integral.out

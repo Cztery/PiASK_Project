@@ -19,19 +19,18 @@ ompbuild: omp_integral
 
 
 mpi_integral: integral_mpi.c
-#because we can compile only in interactive mode, open bash and manually enter compile command
 	command -v mpicc || module add plgrid/tools/openmpi; \
-	srun -N 1 --ntasks-per-node=4 -p plgrid-c7 -t 01:30:00 --pty /bin/bash
+        srun -N1 --ntasks-per-node=1 -p plgrid-c7 -t 00:10:00 mpicc integral_mpi.c -o mpi_integral -lm -ldl -std=c99 
 mpibuild: mpi_integral
 
 
 
 
 curun: cu_integral
-	sbatch integral_cu.sh && squeue
+	sbatch integral_cu.sh && squeue && sleep 5 && cat cu_integral.out
 
 omprun: omp_integral
-	sbatch integral_omp.sh && squeue
+	sbatch integral_omp.sh && squeue && sleep 5 && cat omp_integral.out
 
 mpirun: mpi_integral
-	sbatch integral_mpi.sh && squeue
+	sbatch integral_mpi.sh && squeue && sleep 10 && cat mpi_integral.out
